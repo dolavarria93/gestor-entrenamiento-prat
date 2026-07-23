@@ -20,11 +20,24 @@ export default async function AdminPage() {
     clubId = primerClub?.id ?? null;
   }
 
-  const { data: teams } = await supabase
-    .from("teams")
-    .select("id, nombre, categoria")
+  const { data: categorias } = await supabase
+    .from("categorias")
+    .select("id, nombre, orden")
     .eq("club_id", clubId ?? "")
-    .order("categoria");
+    .order("orden");
+
+  const categoriaPorId = new Map((categorias ?? []).map((c) => [c.id, c]));
+
+  const { data: teamsRaw } = await supabase
+    .from("teams")
+    .select("id, nombre, categoria_id")
+    .eq("club_id", clubId ?? "");
+
+  const teams = (teamsRaw ?? []).slice().sort((a, b) => {
+    const ordenA = categoriaPorId.get(a.categoria_id)?.orden ?? 0;
+    const ordenB = categoriaPorId.get(b.categoria_id)?.orden ?? 0;
+    return ordenA - ordenB || a.nombre.localeCompare(b.nombre);
+  });
 
   const equipos = await Promise.all(
     (teams ?? []).map(async (team) => {
@@ -61,9 +74,14 @@ export default async function AdminPage() {
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-6">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-xl font-semibold text-ink">Panel del club</h1>
-        <Link href="/admin/entrenadores" className="text-sm text-prat-blue hover:underline">
-          Entrenadores →
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/admin/categorias" className="text-sm text-prat-blue hover:underline">
+            Categorías →
+          </Link>
+          <Link href="/admin/entrenadores" className="text-sm text-prat-blue hover:underline">
+            Entrenadores →
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -77,7 +95,7 @@ export default async function AdminPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-ink/50">{team.categoria}</p>
+                <p className="text-xs text-ink/50">{categoriaPorId.get(team.categoria_id)?.nombre ?? ""}</p>
                 <p className="font-display font-semibold text-ink">{team.nombre}</p>
               </div>
               {alerta && (

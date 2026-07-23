@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile } from "@/lib/auth";
 import NuevoEntrenadorForm from "./NuevoEntrenadorForm";
+import EliminarEntrenadorButton from "./EliminarEntrenadorButton";
 
 export default async function EntrenadoresPage() {
   const profile = await requireProfile();
@@ -64,12 +65,15 @@ export default async function EntrenadoresPage() {
         ) : (
           <div className="mt-3 flex flex-col divide-y divide-ink/5">
             {coachesConEmail.map((coach) => (
-              <div key={coach.id} className="py-2 text-sm">
-                <p className="text-ink">{coach.nombre}</p>
-                <p className="text-xs text-ink/50">{coach.email}</p>
-                <p className="text-xs text-ink/40">
-                  {(equiposPorCoach.get(coach.id) ?? []).join(", ") || "Sin equipo asignado"}
-                </p>
+              <div key={coach.id} className="flex items-start justify-between gap-4 py-2 text-sm">
+                <div>
+                  <p className="text-ink">{coach.nombre}</p>
+                  <p className="text-xs text-ink/50">{coach.email}</p>
+                  <p className="text-xs text-ink/40">
+                    {(equiposPorCoach.get(coach.id) ?? []).join(", ") || "Sin equipo asignado"}
+                  </p>
+                </div>
+                <EliminarEntrenadorButton coachId={coach.id} userId={coach.user_id} nombre={coach.nombre} />
               </div>
             ))}
           </div>

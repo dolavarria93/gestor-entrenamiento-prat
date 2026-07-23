@@ -3,7 +3,7 @@
 import { useState } from "react";
 import EvaluationForm from "./EvaluationForm";
 import { ESCALA_EVALUACION } from "@/lib/fundamentos";
-import type { Categoria, Periodo } from "@/lib/supabase/database.types";
+import type { Periodo } from "@/lib/supabase/database.types";
 
 interface EvaluacionFundamento {
   fundamento: string;
@@ -11,14 +11,14 @@ interface EvaluacionFundamento {
 }
 
 export default function EvaluationPeriodSection({
-  categoria,
+  categoriaId,
   playerId,
   periodo,
   fundamentos,
   evaluacionesPeriodo,
   notasPrevias,
 }: {
-  categoria: Categoria;
+  categoriaId: string;
   playerId: string;
   periodo: Periodo;
   fundamentos: string[];
@@ -56,7 +56,7 @@ export default function EvaluationPeriodSection({
       {editando ? (
         <div className="mt-3">
           <EvaluationForm
-            categoria={categoria}
+            categoriaId={categoriaId}
             playerId={playerId}
             periodo={periodo}
             fundamentos={fundamentos}

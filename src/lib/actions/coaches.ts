@@ -84,3 +84,43 @@ export async function crearEntrenador(
   revalidatePath("/", "layout");
   return { ok: true, email, password };
 }
+
+export async function eliminarEntrenador(
+  _prevState: { error?: string; ok?: boolean } | undefined,
+  formData: FormData,
+) {
+  const profile = await requireProfile();
+
+  if (profile.role !== "admin_club" && profile.role !== "super_admin") {
+    return { error: "No tenés permiso para eliminar entrenadores." };
+  }
+
+  const coachId = String(formData.get("coach_id") ?? "");
+  const userId = String(formData.get("user_id") ?? "");
+
+  if (!coachId || !userId) return { error: "Falta el entrenador." };
+
+  const supabase = await createClient();
+
+  // Le sacamos el acceso a sus equipos de entrada, pase lo que pase con el
+  // resto — así deja de poder cargar nada aunque no se pueda borrar del todo.
+  const { error: ctError } = await supabase.from("coach_teams").delete().eq("coach_id", coachId);
+  if (ctError) {
+    return { error: "No se pudo quitar el acceso a los equipos: " + ctError.message };
+  }
+
+  const admin = createAdminClient();
+  const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+
+  if (deleteError) {
+    revalidatePath("/", "layout");
+    return {
+      error:
+        "Le saqué el acceso a sus equipos, pero no se pudo borrar la cuenta por completo — probablemente " +
+        "tiene sesiones registradas en el historial. Ya no puede cargar ni ver nada nuevo.",
+    };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

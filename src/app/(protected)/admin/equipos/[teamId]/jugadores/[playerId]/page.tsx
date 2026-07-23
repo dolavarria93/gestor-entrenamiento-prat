@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { PERIODOS, FUNDAMENTOS_POR_CATEGORIA } from "@/lib/fundamentos";
+import { PERIODOS } from "@/lib/fundamentos";
+import { getFundamentos } from "@/lib/queries/categorias";
 import AttendanceHistory from "@/components/AttendanceHistory";
 import EvaluationPeriodSection from "@/components/EvaluationPeriodSection";
-import type { Categoria, Periodo } from "@/lib/supabase/database.types";
+import type { Periodo } from "@/lib/supabase/database.types";
 
 export default async function JugadoraDetallePage({
   params,
@@ -26,7 +27,7 @@ export default async function JugadoraDetallePage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria")
+    .select("id, nombre, categoria_id")
     .eq("id", teamId)
     .maybeSingle();
 
@@ -52,7 +53,7 @@ export default async function JugadoraDetallePage({
     .map((a) => ({ fecha: fechaPorSesion.get(a.session_id), presente: a.presente }))
     .filter((r): r is { fecha: string; presente: boolean } => Boolean(r.fecha));
 
-  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria as Categoria];
+  const fundamentos = await getFundamentos(supabase, team.categoria_id);
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
@@ -71,7 +72,7 @@ export default async function JugadoraDetallePage({
         return (
           <EvaluationPeriodSection
             key={periodo}
-            categoria={team.categoria}
+            categoriaId={team.categoria_id}
             playerId={player.id}
             periodo={periodo as Periodo}
             fundamentos={fundamentos}

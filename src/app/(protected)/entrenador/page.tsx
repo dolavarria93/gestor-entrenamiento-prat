@@ -32,9 +32,15 @@ export default async function EntrenadorPage() {
   const teamIds = (coachTeams ?? []).map((ct) => ct.team_id);
 
   const { data: teamsData } = teamIds.length
-    ? await supabase.from("teams").select("id, nombre, categoria").in("id", teamIds)
+    ? await supabase.from("teams").select("id, nombre, categoria_id").in("id", teamIds)
     : { data: [] };
   const teams = teamsData ?? [];
+
+  const categoriaIds = teams.map((t) => t.categoria_id);
+  const { data: categoriasData } = categoriaIds.length
+    ? await supabase.from("categorias").select("id, nombre").in("id", categoriaIds)
+    : { data: [] };
+  const nombreCategoria = new Map((categoriasData ?? []).map((c) => [c.id, c.nombre]));
 
   if (teams.length === 0) {
     return (
@@ -62,7 +68,7 @@ export default async function EntrenadorPage() {
             className="rounded-xl border border-ink/10 bg-white px-4 py-4 shadow-sm transition hover:border-prat-blue"
           >
             <p className="font-display font-semibold text-ink">{team.nombre}</p>
-            <p className="text-sm text-ink/50">{team.categoria}</p>
+            <p className="text-sm text-ink/50">{nombreCategoria.get(team.categoria_id) ?? ""}</p>
           </Link>
         ))}
       </div>

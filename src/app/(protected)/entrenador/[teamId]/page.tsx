@@ -20,11 +20,17 @@ export default async function EquipoSesionPage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria")
+    .select("id, nombre, categoria_id")
     .eq("id", teamId)
     .maybeSingle();
 
   if (!team) notFound();
+
+  const { data: categoria } = await supabase
+    .from("categorias")
+    .select("nombre")
+    .eq("id", team.categoria_id)
+    .maybeSingle();
 
   const { data: players } = await supabase
     .from("players")
@@ -57,14 +63,21 @@ export default async function EquipoSesionPage({
       .select("id", { count: "exact", head: true })
       .eq("team_id", teamId);
 
-    const orden = ordenSiguiente(team.categoria, count ?? 0);
-
-    const { data: pasoPlan } = await supabase
+    const { count: planLength } = await supabase
       .from("plan_progresion")
-      .select("titulo, contenido")
-      .eq("categoria", team.categoria)
-      .eq("orden", orden)
-      .maybeSingle();
+      .select("id", { count: "exact", head: true })
+      .eq("categoria_id", team.categoria_id);
+
+    const orden = ordenSiguiente(planLength ?? 0, count ?? 0);
+
+    const { data: pasoPlan } = orden
+      ? await supabase
+          .from("plan_progresion")
+          .select("titulo, contenido")
+          .eq("categoria_id", team.categoria_id)
+          .eq("orden", orden)
+          .maybeSingle()
+      : { data: null };
 
     contenidoPlanificado = pasoPlan ? `${pasoPlan.titulo}\n\n${pasoPlan.contenido}` : "";
   }
@@ -81,7 +94,7 @@ export default async function EquipoSesionPage({
   return (
     <div className="flex flex-1 flex-col gap-5 px-4 py-6 sm:px-6">
       <div>
-        <p className="text-sm text-ink/50">{team.categoria}</p>
+        <p className="text-sm text-ink/50">{categoria?.nombre ?? ""}</p>
         <h1 className="font-display text-xl font-semibold text-ink">{team.nombre}</h1>
       </div>
 

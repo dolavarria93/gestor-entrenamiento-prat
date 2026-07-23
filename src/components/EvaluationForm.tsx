@@ -3,10 +3,10 @@
 import { useActionState, useState } from "react";
 import { guardarEvaluacion } from "@/lib/actions/evaluations";
 import { ESCALA_EVALUACION } from "@/lib/fundamentos";
-import type { Categoria, Periodo } from "@/lib/supabase/database.types";
+import type { Periodo } from "@/lib/supabase/database.types";
 
 export default function EvaluationForm({
-  categoria,
+  categoriaId,
   playerId,
   periodo,
   fundamentos,
@@ -14,7 +14,7 @@ export default function EvaluationForm({
   notasPrevias,
   variant = "fixed",
 }: {
-  categoria: Categoria;
+  categoriaId: string;
   playerId: string;
   periodo: Periodo;
   fundamentos: string[];
@@ -27,7 +27,7 @@ export default function EvaluationForm({
 
   return (
     <form action={formAction} className={`flex flex-col gap-4 ${variant === "fixed" ? "pb-24" : ""}`}>
-      <input type="hidden" name="categoria" value={categoria} />
+      <input type="hidden" name="categoria_id" value={categoriaId} />
       <input type="hidden" name="player_id" value={playerId} />
       <input type="hidden" name="periodo" value={periodo} />
 

@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { FUNDAMENTOS_POR_CATEGORIA } from "@/lib/fundamentos";
-import type { Categoria, Periodo } from "@/lib/supabase/database.types";
+import { getFundamentos } from "@/lib/queries/categorias";
+import type { Periodo } from "@/lib/supabase/database.types";
 
 export async function guardarEvaluacion(
   _prevState: { error?: string; ok?: boolean } | undefined,
@@ -15,14 +15,17 @@ export async function guardarEvaluacion(
 
   const playerId = String(formData.get("player_id") ?? "");
   const periodo = String(formData.get("periodo") ?? "") as Periodo;
-  const categoria = String(formData.get("categoria") ?? "") as Categoria;
+  const categoriaId = String(formData.get("categoria_id") ?? "");
   const notas = String(formData.get("notas") ?? "").trim() || null;
 
-  if (!playerId || !periodo || !categoria) {
+  if (!playerId || !periodo || !categoriaId) {
     return { error: "Falta seleccionar jugador y período." };
   }
 
-  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[categoria];
+  const fundamentos = await getFundamentos(supabase, categoriaId);
+  if (fundamentos.length === 0) {
+    return { error: "Esta categoría todavía no tiene fundamentos de evaluación definidos." };
+  }
 
   const rows = fundamentos.map((fundamento) => {
     const puntaje = Number(formData.get(`puntaje_${fundamento}`));

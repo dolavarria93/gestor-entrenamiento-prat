@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { FUNDAMENTOS_POR_CATEGORIA, PERIODOS } from "@/lib/fundamentos";
-import type { Categoria, Periodo } from "@/lib/supabase/database.types";
+import { PERIODOS } from "@/lib/fundamentos";
+import { getFundamentos } from "@/lib/queries/categorias";
+import type { Periodo } from "@/lib/supabase/database.types";
 import TeamTabs from "@/components/TeamTabs";
 import EvaluationForm from "@/components/EvaluationForm";
 import PlayerPeriodPicker from "./PlayerPeriodPicker";
@@ -21,11 +22,17 @@ export default async function EvaluacionesPage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria")
+    .select("id, nombre, categoria_id")
     .eq("id", teamId)
     .maybeSingle();
 
   if (!team) notFound();
+
+  const { data: categoria } = await supabase
+    .from("categorias")
+    .select("nombre")
+    .eq("id", team.categoria_id)
+    .maybeSingle();
 
   const { data: players } = await supabase
     .from("players")
@@ -33,7 +40,7 @@ export default async function EvaluacionesPage({
     .eq("team_id", teamId)
     .order("nombre");
 
-  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria as Categoria];
+  const fundamentos = await getFundamentos(supabase, team.categoria_id);
 
   const selectedPlayerId = sp.player ?? players?.[0]?.id ?? "";
   const selectedPeriodo = (sp.periodo as Periodo) ?? PERIODOS[0];
@@ -54,7 +61,7 @@ export default async function EvaluacionesPage({
   return (
     <div className="flex flex-1 flex-col gap-5 px-4 py-6 sm:px-6">
       <div>
-        <p className="text-sm text-ink/50">{team.categoria} · Evaluación</p>
+        <p className="text-sm text-ink/50">{categoria?.nombre ?? ""} · Evaluación</p>
         <h1 className="font-display text-xl font-semibold text-ink">{team.nombre}</h1>
       </div>
 
@@ -62,6 +69,11 @@ export default async function EvaluacionesPage({
 
       {!players || players.length === 0 ? (
         <p className="text-ink/50">Este equipo todavía no tiene jugadores cargados.</p>
+      ) : fundamentos.length === 0 ? (
+        <p className="text-ink/50">
+          Esta categoría todavía no tiene fundamentos de evaluación definidos. Pedile al admin del club que
+          los cargue en Panel del club → Categorías.
+        </p>
       ) : (
         <>
           <PlayerPeriodPicker
@@ -73,7 +85,7 @@ export default async function EvaluacionesPage({
 
           <EvaluationForm
             key={`${selectedPlayerId}-${selectedPeriodo}`}
-            categoria={team.categoria}
+            categoriaId={team.categoria_id}
             playerId={selectedPlayerId}
             periodo={selectedPeriodo}
             fundamentos={fundamentos}

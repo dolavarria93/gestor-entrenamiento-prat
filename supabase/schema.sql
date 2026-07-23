@@ -21,26 +21,47 @@ create table clubs (
   created_at  timestamptz not null default now()
 );
 
-create table teams (
+-- Categorías de edad del club (Mini, Sub15, Sub18, o las que el admin_club
+-- necesite crear). Antes era una lista fija en el código; ahora es editable
+-- desde /admin/categorias para poder sumar categorías nuevas sin tocar código.
+create table categorias (
   id          uuid primary key default gen_random_uuid(),
   club_id     uuid not null references clubs(id) on delete cascade,
   nombre      text not null,
-  categoria   text not null check (categoria in ('Mini', 'Sub15', 'Sub18')),
-  created_at  timestamptz not null default now()
+  orden       int not null default 0,
+  created_at  timestamptz not null default now(),
+  unique (club_id, nombre)
+);
+
+-- Fundamentos de evaluación por categoría (pauta_evaluacion.docx). Cada
+-- categoría nueva define los suyos al crearse (típicamente copiando los de
+-- una categoría existente como punto de partida).
+create table fundamentos_evaluacion (
+  id            uuid primary key default gen_random_uuid(),
+  categoria_id  uuid not null references categorias(id) on delete cascade,
+  nombre        text not null,
+  orden         int not null default 0
+);
+
+create table teams (
+  id            uuid primary key default gen_random_uuid(),
+  club_id       uuid not null references clubs(id) on delete cascade,
+  nombre        text not null,
+  categoria_id  uuid not null references categorias(id),
+  created_at    timestamptz not null default now()
 );
 
 -- Curriculum de referencia (plan_entrenamiento_progresion.docx), usado para
 -- precargar el contenido_planificado de una sesión según categoría y orden.
--- Dato global de referencia, no depende de club_id (una sola progresión por
--- categoría hoy; si a futuro un club quiere su propia progresión, se le suma
--- club_id nullable sin romper esto).
+-- Si una categoría nueva no tiene progresión cargada, el entrenador
+-- simplemente escribe el contenido planificado a mano ese día.
 create table plan_progresion (
-  id          uuid primary key default gen_random_uuid(),
-  categoria   text not null check (categoria in ('Mini', 'Sub15', 'Sub18')),
-  orden       int not null,
-  titulo      text not null,
-  contenido   text not null,
-  unique (categoria, orden)
+  id            uuid primary key default gen_random_uuid(),
+  categoria_id  uuid not null references categorias(id) on delete cascade,
+  orden         int not null,
+  titulo        text not null,
+  contenido     text not null,
+  unique (categoria_id, orden)
 );
 
 -- Capa de autenticación/rol. No está en el listado original del spec, pero es
@@ -140,7 +161,10 @@ create table announcements (
 -- ----------------------------------------------------------------------------
 -- Índices de apoyo
 -- ----------------------------------------------------------------------------
+create index on categorias (club_id);
+create index on fundamentos_evaluacion (categoria_id);
 create index on teams (club_id);
+create index on teams (categoria_id);
 create index on coaches (club_id);
 create index on players (team_id);
 create index on sessions (team_id, fecha);
@@ -216,6 +240,8 @@ $$;
 -- Row Level Security
 -- ----------------------------------------------------------------------------
 alter table clubs enable row level security;
+alter table categorias enable row level security;
+alter table fundamentos_evaluacion enable row level security;
 alter table teams enable row level security;
 alter table plan_progresion enable row level security;
 alter table profiles enable row level security;
@@ -236,6 +262,35 @@ create policy "clubs_select" on clubs for select
 create policy "clubs_write_super_admin" on clubs for all
   using (app_role() = 'super_admin')
   with check (app_role() = 'super_admin');
+
+-- categorias -------------------------------------------------------------
+create policy "categorias_select" on categorias for select
+  using (app_role() = 'super_admin' or club_id = current_club_id());
+
+create policy "categorias_write_admin" on categorias for all
+  using (app_role() = 'super_admin' or (app_role() = 'admin_club' and club_id = current_club_id()))
+  with check (app_role() = 'super_admin' or (app_role() = 'admin_club' and club_id = current_club_id()));
+
+-- fundamentos_evaluacion ---------------------------------------------------
+create policy "fundamentos_evaluacion_select" on fundamentos_evaluacion for select
+  using (
+    app_role() = 'super_admin'
+    or exists (select 1 from categorias c where c.id = categoria_id and c.club_id = current_club_id())
+  );
+
+create policy "fundamentos_evaluacion_write_admin" on fundamentos_evaluacion for all
+  using (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and exists (
+      select 1 from categorias c where c.id = categoria_id and c.club_id = current_club_id()
+    ))
+  )
+  with check (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and exists (
+      select 1 from categorias c where c.id = categoria_id and c.club_id = current_club_id()
+    ))
+  );
 
 -- plan_progresion ----------------------------------------------------------
 create policy "plan_progresion_select_authenticated" on plan_progresion for select

@@ -10,11 +10,17 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria")
+    .select("id, nombre, categoria_id")
     .eq("id", teamId)
     .maybeSingle();
 
   if (!team) notFound();
+
+  const { data: categoria } = await supabase
+    .from("categorias")
+    .select("nombre")
+    .eq("id", team.categoria_id)
+    .maybeSingle();
 
   const { data: players } = await supabase
     .from("players")
@@ -83,7 +89,7 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
         <Link href="/admin" className="text-sm text-prat-blue hover:underline">
           ← Panel del club
         </Link>
-        <p className="mt-2 text-sm text-ink/50">{team.categoria}</p>
+        <p className="mt-2 text-sm text-ink/50">{categoria?.nombre ?? ""}</p>
         <h1 className="font-display text-xl font-semibold text-ink">{team.nombre}</h1>
       </div>
 
