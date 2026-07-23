@@ -59,7 +59,12 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-6">
-      <h1 className="font-display text-xl font-semibold text-ink">Panel del club</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-xl font-semibold text-ink">Panel del club</h1>
+        <Link href="/admin/entrenadores" className="text-sm text-prat-blue hover:underline">
+          Entrenadores →
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {equipos.map(({ team, ultimaSesion, asistenciaPromedio, dias, alerta }) => (
