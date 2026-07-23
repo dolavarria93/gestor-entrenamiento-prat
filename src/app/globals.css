@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  /* Paleta Club Prat — derivada del logo, ver spec_app_club.md */
+  --ink: #0a0a0a;
+  --ink-soft: #1c2333;
+  --prat-blue: #2f4fcc;
+  --sky-periwinkle: #8b9ae8;
+  --cisnes-gold: #f5b818;
+  --paper: #f7f8fc;
+
+  --alert-red: #d1453b;
+  --success-green: #2f9e5f;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-prat-blue: var(--prat-blue);
+  --color-sky-periwinkle: var(--sky-periwinkle);
+  --color-cisnes-gold: var(--cisnes-gold);
+  --color-paper: var(--paper);
+  --color-alert-red: var(--alert-red);
+  --color-success-green: var(--success-green);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+body {
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display), sans-serif;
+}
+
+/* Motivo de firma: costura curva del balón, como divisor entre secciones */
+.seam-divider {
+  height: 6px;
+  background-image: radial-gradient(circle at 6px 6px, var(--cisnes-gold) 2.5px, transparent 2.5px);
+  background-size: 16px 12px;
+  background-repeat: repeat-x;
+  background-position: center;
+  opacity: 0.7;
+}
