@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { FUNDAMENTOS_POR_CATEGORIA, PERIODOS } from "@/lib/fundamentos";
-import type { Periodo } from "@/lib/supabase/database.types";
+import type { Categoria, Periodo } from "@/lib/supabase/database.types";
 import TeamTabs from "@/components/TeamTabs";
 import EvaluationForm from "@/components/EvaluationForm";
 import PlayerPeriodPicker from "./PlayerPeriodPicker";
@@ -33,7 +33,7 @@ export default async function EvaluacionesPage({
     .eq("team_id", teamId)
     .order("nombre");
 
-  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria];
+  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria as Categoria];
 
   const selectedPlayerId = sp.player ?? players?.[0]?.id ?? "";
   const selectedPeriodo = (sp.periodo as Periodo) ?? PERIODOS[0];

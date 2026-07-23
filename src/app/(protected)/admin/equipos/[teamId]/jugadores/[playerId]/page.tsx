@@ -5,7 +5,7 @@ import { requireProfile } from "@/lib/auth";
 import { PERIODOS, FUNDAMENTOS_POR_CATEGORIA } from "@/lib/fundamentos";
 import AttendanceHistory from "@/components/AttendanceHistory";
 import EvaluationPeriodSection from "@/components/EvaluationPeriodSection";
-import type { Periodo } from "@/lib/supabase/database.types";
+import type { Categoria, Periodo } from "@/lib/supabase/database.types";
 
 export default async function JugadoraDetallePage({
   params,
@@ -39,14 +39,20 @@ export default async function JugadoraDetallePage({
 
   const { data: attendanceRaw } = await supabase
     .from("attendance")
-    .select("presente, sessions(fecha)")
+    .select("presente, session_id")
     .eq("player_id", playerId);
 
-  const registrosAsistencia = (attendanceRaw ?? [])
-    .filter((a): a is typeof a & { sessions: { fecha: string } } => Boolean(a.sessions?.fecha))
-    .map((a) => ({ fecha: a.sessions.fecha, presente: a.presente }));
+  const sessionIds = (attendanceRaw ?? []).map((a) => a.session_id);
+  const { data: sesionesAsistidas } = sessionIds.length
+    ? await supabase.from("sessions").select("id, fecha").in("id", sessionIds)
+    : { data: [] };
+  const fechaPorSesion = new Map((sesionesAsistidas ?? []).map((s) => [s.id, s.fecha]));
 
-  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria];
+  const registrosAsistencia = (attendanceRaw ?? [])
+    .map((a) => ({ fecha: fechaPorSesion.get(a.session_id), presente: a.presente }))
+    .filter((r): r is { fecha: string; presente: boolean } => Boolean(r.fecha));
+
+  const fundamentos = FUNDAMENTOS_POR_CATEGORIA[team.categoria as Categoria];
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6">

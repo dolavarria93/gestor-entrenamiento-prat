@@ -26,12 +26,15 @@ export default async function EntrenadorPage() {
 
   const { data: coachTeams } = await supabase
     .from("coach_teams")
-    .select("team_id, teams(id, nombre, categoria)")
+    .select("team_id")
     .eq("coach_id", coach.id);
 
-  const teams = (coachTeams ?? [])
-    .map((ct) => ct.teams)
-    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+  const teamIds = (coachTeams ?? []).map((ct) => ct.team_id);
+
+  const { data: teamsData } = teamIds.length
+    ? await supabase.from("teams").select("id, nombre, categoria").in("id", teamIds)
+    : { data: [] };
+  const teams = teamsData ?? [];
 
   if (teams.length === 0) {
     return (

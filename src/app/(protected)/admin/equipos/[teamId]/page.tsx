@@ -29,20 +29,22 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
     .order("fecha", { ascending: false })
     .limit(10);
 
+  const nombrePorJugador = new Map((players ?? []).map((p) => [p.id, p.nombre]));
+
   const sesionesConAsistencia = await Promise.all(
     (sesiones ?? []).map(async (s) => {
       const { data: attendance } = await supabase
         .from("attendance")
-        .select("presente, players(nombre)")
+        .select("presente, player_id")
         .eq("session_id", s.id);
 
       const nombresPresentes = (attendance ?? [])
         .filter((a) => a.presente)
-        .map((a) => a.players?.nombre)
+        .map((a) => nombrePorJugador.get(a.player_id))
         .filter((n): n is string => Boolean(n));
       const nombresAusentes = (attendance ?? [])
         .filter((a) => !a.presente)
-        .map((a) => a.players?.nombre)
+        .map((a) => nombrePorJugador.get(a.player_id))
         .filter((n): n is string => Boolean(n));
 
       return {
