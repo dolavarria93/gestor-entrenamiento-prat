@@ -37,6 +37,23 @@ export async function crearEntrenador(
   }
   if (!clubId) return { error: "No se encontró el club." };
 
+  // Diagnóstico temporal: confirmar que la service_role key llegó limpia a
+  // producción antes de usarla, en vez de dejar que Supabase tire un error
+  // críptico de encoding.
+  const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const badCharIndex = [...rawKey].findIndex((c) => c.codePointAt(0)! > 255);
+  if (!rawKey) {
+    return { error: "DIAGNÓSTICO: SUPABASE_SERVICE_ROLE_KEY no está definida en este deploy." };
+  }
+  if (badCharIndex !== -1) {
+    return {
+      error:
+        `DIAGNÓSTICO: la clave tiene un carácter raro en la posición ${badCharIndex} ` +
+        `(código ${rawKey.codePointAt(badCharIndex)}). Largo total: ${rawKey.length}. ` +
+        `Primeros 10: "${rawKey.slice(0, 10)}", últimos 10: "${rawKey.slice(-10)}".`,
+    };
+  }
+
   const password = generarPassword();
   const admin = createAdminClient();
 
