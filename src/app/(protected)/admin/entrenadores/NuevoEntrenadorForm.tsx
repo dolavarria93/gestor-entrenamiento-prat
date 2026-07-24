@@ -6,7 +6,6 @@ import { crearEntrenador } from "@/lib/actions/coaches";
 interface Team {
   id: string;
   nombre: string;
-  categoria: string;
 }
 
 export default function NuevoEntrenadorForm({ teams }: { teams: Team[] }) {

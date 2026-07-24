@@ -17,9 +17,9 @@ export default async function EntrenadoresPage() {
 
   const { data: teams } = await supabase
     .from("teams")
-    .select("id, nombre, categoria")
+    .select("id, nombre")
     .eq("club_id", clubId ?? "")
-    .order("categoria");
+    .order("nombre");
 
   const { data: coaches } = await supabase
     .from("coaches")
