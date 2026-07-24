@@ -2,15 +2,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
+import { getPlayersForTeam } from "@/lib/queries/players";
+import NuevoJugadorForm from "@/components/NuevoJugadorForm";
+import ImportarJugadoresForm from "@/components/ImportarJugadoresForm";
 
 export default async function AdminEquipoPage({ params }: { params: Promise<{ teamId: string }> }) {
   const { teamId } = await params;
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria_id")
+    .select("id, nombre, categoria_id, club_id")
     .eq("id", teamId)
     .maybeSingle();
 
@@ -22,11 +25,26 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
     .eq("id", team.categoria_id)
     .maybeSingle();
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, nombre, posicion, fecha_nacimiento")
-    .eq("team_id", teamId)
-    .order("nombre");
+  const clubId = profile.club_id ?? team.club_id;
+
+  const { data: categorias } = await supabase
+    .from("categorias")
+    .select("id, nombre, orden")
+    .eq("club_id", clubId ?? "")
+    .order("orden");
+
+  const nombreCategoriaPorId = new Map((categorias ?? []).map((c) => [c.id, c.nombre]));
+
+  const { data: todosLosEquipos } = await supabase
+    .from("teams")
+    .select("id, nombre, categoria_id")
+    .eq("club_id", clubId ?? "");
+
+  const equiposParaSelect = (todosLosEquipos ?? [])
+    .map((t) => ({ id: t.id, nombre: t.nombre, categoriaNombre: nombreCategoriaPorId.get(t.categoria_id) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const players = await getPlayersForTeam(supabase, teamId);
 
   const { data: sesiones } = await supabase
     .from("sessions")
@@ -35,7 +53,7 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
     .order("fecha", { ascending: false })
     .limit(10);
 
-  const nombrePorJugador = new Map((players ?? []).map((p) => [p.id, p.nombre]));
+  const nombrePorJugador = new Map(players.map((p) => [p.id, p.nombre]));
 
   const sesionesConAsistencia = await Promise.all(
     (sesiones ?? []).map(async (s) => {
@@ -64,7 +82,7 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
   );
 
   const promediosPorJugador = await Promise.all(
-    (players ?? []).map(async (player) => {
+    players.map(async (player) => {
       const { data: evals } = await supabase
         .from("evaluations")
         .select("puntaje, periodo")
@@ -85,17 +103,25 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
-      <div>
-        <Link href="/admin" className="text-sm text-prat-blue hover:underline">
-          ← Panel del club
-        </Link>
-        <p className="mt-2 text-sm text-ink/50">{categoria?.nombre ?? ""}</p>
-        <h1 className="font-display text-xl font-semibold text-ink">{team.nombre}</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <Link href="/admin" className="text-sm text-prat-blue hover:underline">
+            ← Panel del club
+          </Link>
+          <p className="mt-2 text-sm text-ink/50">{categoria?.nombre ?? ""}</p>
+          <h1 className="font-display text-xl font-semibold text-ink">{team.nombre}</h1>
+        </div>
+        <a
+          href={`/api/export/equipo/${teamId}`}
+          className="rounded-lg border border-prat-blue px-3 py-1.5 text-sm text-prat-blue hover:bg-prat-blue/5"
+        >
+          Descargar nómina (Excel)
+        </a>
       </div>
 
       <section className="rounded-xl border border-ink/10 bg-white p-4">
         <h2 className="font-display text-sm font-semibold text-prat-blue">Plantel</h2>
-        {!players || players.length === 0 ? (
+        {players.length === 0 ? (
           <p className="mt-2 text-sm text-ink/50">Sin jugadores cargados todavía.</p>
         ) : (
           <div className="mt-3 flex flex-col divide-y divide-ink/5">
@@ -159,6 +185,10 @@ export default async function AdminEquipoPage({ params }: { params: Promise<{ te
           </div>
         )}
       </section>
+
+      <ImportarJugadoresForm teamId={teamId} />
+
+      <NuevoJugadorForm teamId={teamId} equipos={equiposParaSelect} />
     </div>
   );
 }

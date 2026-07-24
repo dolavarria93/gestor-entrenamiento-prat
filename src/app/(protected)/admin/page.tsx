@@ -39,6 +39,10 @@ export default async function AdminPage() {
     return ordenA - ordenB || a.nombre.localeCompare(b.nombre);
   });
 
+  const categoriasSinEquipo = (categorias ?? []).filter(
+    (c) => !teams.some((t) => t.categoria_id === c.id),
+  );
+
   const equipos = await Promise.all(
     (teams ?? []).map(async (team) => {
       const { data: sesiones } = await supabase
@@ -121,10 +125,21 @@ export default async function AdminPage() {
             </div>
           </Link>
         ))}
+
+        {categoriasSinEquipo.map((cat) => (
+          <Link
+            key={cat.id}
+            href="/admin/categorias"
+            className="flex flex-col gap-1 rounded-xl border border-dashed border-ink/20 bg-white/50 p-4 transition hover:border-prat-blue"
+          >
+            <p className="text-xs text-ink/50">{cat.nombre}</p>
+            <p className="text-sm text-ink/40">Sin equipos todavía — crear uno →</p>
+          </Link>
+        ))}
       </div>
 
-      {equipos.length === 0 && (
-        <p className="text-ink/50">Todavía no hay equipos cargados para este club.</p>
+      {equipos.length === 0 && categoriasSinEquipo.length === 0 && (
+        <p className="text-ink/50">Todavía no hay categorías ni equipos cargados para este club.</p>
       )}
     </div>
   );

@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { PERIODOS } from "@/lib/fundamentos";
 import { getFundamentos } from "@/lib/queries/categorias";
+import { getTeamIdsForPlayer } from "@/lib/queries/players";
 import AttendanceHistory from "@/components/AttendanceHistory";
 import EvaluationPeriodSection from "@/components/EvaluationPeriodSection";
+import PlayerDetailHeader from "./PlayerDetailHeader";
 import type { Periodo } from "@/lib/supabase/database.types";
 
 export default async function JugadoraDetallePage({
@@ -14,24 +16,44 @@ export default async function JugadoraDetallePage({
   params: Promise<{ teamId: string; playerId: string }>;
 }) {
   const { teamId, playerId } = await params;
-  await requireProfile();
+  const profile = await requireProfile();
   const supabase = await createClient();
 
   const { data: player } = await supabase
     .from("players")
-    .select("id, nombre, posicion, fecha_nacimiento, notas, team_id")
+    .select("id, nombre, rut, posicion, fecha_nacimiento, notas")
     .eq("id", playerId)
     .maybeSingle();
 
-  if (!player || player.team_id !== teamId) notFound();
+  if (!player) notFound();
+
+  const equiposSeleccionados = await getTeamIdsForPlayer(supabase, playerId);
+  if (!equiposSeleccionados.includes(teamId)) notFound();
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, nombre, categoria_id")
+    .select("id, nombre, categoria_id, club_id")
     .eq("id", teamId)
     .maybeSingle();
 
   if (!team) notFound();
+
+  const clubId = profile.club_id ?? team.club_id;
+
+  const { data: categorias } = await supabase
+    .from("categorias")
+    .select("id, nombre")
+    .eq("club_id", clubId ?? "");
+  const nombreCategoriaPorId = new Map((categorias ?? []).map((c) => [c.id, c.nombre]));
+
+  const { data: todosLosEquipos } = await supabase
+    .from("teams")
+    .select("id, nombre, categoria_id")
+    .eq("club_id", clubId ?? "");
+
+  const equiposParaSelect = (todosLosEquipos ?? [])
+    .map((t) => ({ id: t.id, nombre: t.nombre, categoriaNombre: nombreCategoriaPorId.get(t.categoria_id) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   const { data: evaluaciones } = await supabase
     .from("evaluations")
@@ -61,8 +83,14 @@ export default async function JugadoraDetallePage({
         <Link href={`/admin/equipos/${teamId}`} className="text-sm text-prat-blue hover:underline">
           ← {team.nombre}
         </Link>
-        <h1 className="mt-2 font-display text-xl font-semibold text-ink">{player.nombre}</h1>
-        {player.posicion && <p className="text-sm text-ink/50">{player.posicion}</p>}
+        <div className="mt-2">
+          <PlayerDetailHeader
+            player={player}
+            teamId={teamId}
+            equipos={equiposParaSelect}
+            equiposSeleccionados={equiposSeleccionados}
+          />
+        </div>
       </div>
 
       <AttendanceHistory registros={registrosAsistencia} />

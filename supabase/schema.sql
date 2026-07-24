@@ -92,12 +92,23 @@ create table coach_teams (
 
 create table players (
   id                uuid primary key default gen_random_uuid(),
-  team_id           uuid not null references teams(id) on delete cascade,
   nombre            text not null,
+  rut               text,
   fecha_nacimiento  date,
   posicion          text,
   notas             text,
+  activo            boolean not null default true,
+  motivo_baja       text,
+  fecha_baja        date,
   created_at        timestamptz not null default now()
+);
+
+-- Un jugador puede pertenecer a varios equipos/categorías a la vez
+-- (ej. juega Sub15 y Sub18 en simultáneo).
+create table player_teams (
+  player_id  uuid not null references players(id) on delete cascade,
+  team_id    uuid not null references teams(id) on delete cascade,
+  primary key (player_id, team_id)
 );
 
 create table guardians (
@@ -166,7 +177,7 @@ create index on fundamentos_evaluacion (categoria_id);
 create index on teams (club_id);
 create index on teams (categoria_id);
 create index on coaches (club_id);
-create index on players (team_id);
+create index on player_teams (team_id);
 create index on sessions (team_id, fecha);
 create index on attendance (session_id);
 create index on evaluations (player_id, periodo);
@@ -248,6 +259,7 @@ alter table profiles enable row level security;
 alter table coaches enable row level security;
 alter table coach_teams enable row level security;
 alter table players enable row level security;
+alter table player_teams enable row level security;
 alter table guardians enable row level security;
 alter table guardian_players enable row level security;
 alter table sessions enable row level security;
@@ -323,10 +335,10 @@ create policy "teams_select" on teams for select
     or (app_role() in ('admin_club', 'directiva') and club_id = current_club_id())
     or (app_role() = 'entrenador' and is_coach_of_team(id))
     or (app_role() = 'apoderado' and exists (
-          select 1 from players p
-          join guardian_players gp on gp.player_id = p.id
+          select 1 from player_teams pt
+          join guardian_players gp on gp.player_id = pt.player_id
           join guardians g on g.id = gp.guardian_id
-          where g.user_id = auth.uid() and p.team_id = teams.id
+          where g.user_id = auth.uid() and pt.team_id = teams.id
         ))
   );
 
@@ -362,14 +374,64 @@ create policy "coach_teams_write_admin" on coach_teams for all
 create policy "players_select" on players for select
   using (
     app_role() = 'super_admin'
-    or (app_role() in ('admin_club', 'directiva') and team_club_id(team_id) = current_club_id())
-    or (app_role() = 'entrenador' and is_coach_of_team(team_id))
+    or (app_role() in ('admin_club', 'directiva') and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and team_club_id(pt.team_id) = current_club_id()
+        ))
+    or (app_role() = 'entrenador' and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and is_coach_of_team(pt.team_id)
+        ))
     or (app_role() = 'apoderado' and is_guardian_of_player(id))
   );
 
-create policy "players_write_admin" on players for all
-  using (app_role() = 'super_admin' or (app_role() = 'admin_club' and team_club_id(team_id) = current_club_id()))
-  with check (app_role() = 'super_admin' or (app_role() = 'admin_club' and team_club_id(team_id) = current_club_id()));
+-- Insert queda permisivo por rol: el jugador todavía no tiene equipo (se
+-- asigna vía player_teams en el mismo paso desde la app) y no es visible
+-- para nadie hasta tener al menos una fila ahí.
+create policy "players_insert" on players for insert
+  with check (app_role() in ('super_admin', 'admin_club', 'entrenador'));
+
+create policy "players_update" on players for update
+  using (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and team_club_id(pt.team_id) = current_club_id()
+        ))
+    or (app_role() = 'entrenador' and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and is_coach_of_team(pt.team_id)
+        ))
+  )
+  with check (app_role() in ('super_admin', 'admin_club', 'entrenador'));
+
+create policy "players_delete" on players for delete
+  using (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and team_club_id(pt.team_id) = current_club_id()
+        ))
+    or (app_role() = 'entrenador' and exists (
+          select 1 from player_teams pt where pt.player_id = players.id and is_coach_of_team(pt.team_id)
+        ))
+  );
+
+-- player_teams ------------------------------------------------------------
+create policy "player_teams_select" on player_teams for select
+  using (
+    app_role() = 'super_admin'
+    or (app_role() in ('admin_club', 'directiva') and team_club_id(team_id) = current_club_id())
+    or (app_role() = 'entrenador' and is_coach_of_team(team_id))
+    or (app_role() = 'apoderado' and is_guardian_of_player(player_id))
+  );
+
+create policy "player_teams_write" on player_teams for all
+  using (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and team_club_id(team_id) = current_club_id())
+    or (app_role() = 'entrenador' and is_coach_of_team(team_id))
+  )
+  with check (
+    app_role() = 'super_admin'
+    or (app_role() = 'admin_club' and team_club_id(team_id) = current_club_id())
+    or (app_role() = 'entrenador' and is_coach_of_team(team_id))
+  );
 
 -- guardians --------------------------------------------------------------------
 create policy "guardians_select" on guardians for select
@@ -402,10 +464,10 @@ create policy "sessions_select" on sessions for select
     or (app_role() in ('admin_club', 'directiva') and team_club_id(team_id) = current_club_id())
     or (app_role() = 'entrenador' and is_coach_of_team(team_id))
     or (app_role() = 'apoderado' and exists (
-          select 1 from players p
-          join guardian_players gp on gp.player_id = p.id
+          select 1 from player_teams pt
+          join guardian_players gp on gp.player_id = pt.player_id
           join guardians g on g.id = gp.guardian_id
-          where g.user_id = auth.uid() and p.team_id = sessions.team_id
+          where g.user_id = auth.uid() and pt.team_id = sessions.team_id
         ))
   );
 
@@ -483,10 +545,10 @@ create policy "evaluations_select" on evaluations for select
   using (
     app_role() = 'super_admin'
     or (app_role() in ('admin_club', 'directiva') and exists (
-          select 1 from players p where p.id = player_id and team_club_id(p.team_id) = current_club_id()
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and team_club_id(pt.team_id) = current_club_id()
         ))
     or (app_role() = 'entrenador' and exists (
-          select 1 from players p where p.id = player_id and is_coach_of_team(p.team_id)
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and is_coach_of_team(pt.team_id)
         ))
   );
 
@@ -494,10 +556,10 @@ create policy "evaluations_insert" on evaluations for insert
   with check (
     app_role() = 'super_admin'
     or (app_role() = 'admin_club' and exists (
-          select 1 from players p where p.id = player_id and team_club_id(p.team_id) = current_club_id()
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and team_club_id(pt.team_id) = current_club_id()
         ))
     or (app_role() = 'entrenador' and exists (
-          select 1 from players p where p.id = player_id and is_coach_of_team(p.team_id)
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and is_coach_of_team(pt.team_id)
         ))
   );
 
@@ -505,10 +567,10 @@ create policy "evaluations_update" on evaluations for update
   using (
     app_role() = 'super_admin'
     or (app_role() = 'admin_club' and exists (
-          select 1 from players p where p.id = player_id and team_club_id(p.team_id) = current_club_id()
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and team_club_id(pt.team_id) = current_club_id()
         ))
     or (app_role() = 'entrenador' and exists (
-          select 1 from players p where p.id = player_id and is_coach_of_team(p.team_id)
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and is_coach_of_team(pt.team_id)
         ))
   );
 
@@ -516,7 +578,7 @@ create policy "evaluations_delete_admin" on evaluations for delete
   using (
     app_role() = 'super_admin'
     or (app_role() = 'admin_club' and exists (
-          select 1 from players p where p.id = player_id and team_club_id(p.team_id) = current_club_id()
+          select 1 from player_teams pt where pt.player_id = evaluations.player_id and team_club_id(pt.team_id) = current_club_id()
         ))
   );
 
@@ -529,10 +591,10 @@ create policy "announcements_select" on announcements for select
     or (app_role() = 'apoderado' and (
           (team_id is null and club_id = current_club_id())
           or exists (
-            select 1 from players p
-            join guardian_players gp on gp.player_id = p.id
+            select 1 from player_teams pt
+            join guardian_players gp on gp.player_id = pt.player_id
             join guardians g on g.id = gp.guardian_id
-            where g.user_id = auth.uid() and p.team_id = announcements.team_id
+            where g.user_id = auth.uid() and pt.team_id = announcements.team_id
           )
         ))
   );

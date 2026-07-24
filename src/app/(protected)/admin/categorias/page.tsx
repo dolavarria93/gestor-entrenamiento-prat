@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import NuevaCategoriaForm from "./NuevaCategoriaForm";
 import NuevoEquipoForm from "./NuevoEquipoForm";
+import CategoriaCard from "./CategoriaCard";
 
 export default async function CategoriasPage() {
   const profile = await requireProfile();
@@ -41,10 +42,10 @@ export default async function CategoriasPage() {
     fundamentosPorCategoria.set(f.categoria_id, lista);
   }
 
-  const equiposPorCategoria = new Map<string, string[]>();
+  const equiposPorCategoria = new Map<string, { id: string; nombre: string; categoria_id: string }[]>();
   for (const t of teams ?? []) {
     const lista = equiposPorCategoria.get(t.categoria_id) ?? [];
-    lista.push(t.nombre);
+    lista.push(t);
     equiposPorCategoria.set(t.categoria_id, lista);
   }
 
@@ -62,17 +63,15 @@ export default async function CategoriasPage() {
         {!categorias || categorias.length === 0 ? (
           <p className="mt-2 text-sm text-ink/50">Todavía no hay categorías cargadas.</p>
         ) : (
-          <div className="mt-3 flex flex-col divide-y divide-ink/5">
+          <div className="mt-3 flex flex-col gap-3">
             {categorias.map((cat) => (
-              <div key={cat.id} className="py-2 text-sm">
-                <p className="text-ink">{cat.nombre}</p>
-                <p className="text-xs text-ink/40">
-                  Equipos: {(equiposPorCategoria.get(cat.id) ?? []).join(", ") || "ninguno"}
-                </p>
-                <p className="text-xs text-ink/40">
-                  Fundamentos: {(fundamentosPorCategoria.get(cat.id) ?? []).join(", ") || "sin definir"}
-                </p>
-              </div>
+              <CategoriaCard
+                key={cat.id}
+                categoria={cat}
+                fundamentos={fundamentosPorCategoria.get(cat.id) ?? []}
+                equipos={equiposPorCategoria.get(cat.id) ?? []}
+                todasLasCategorias={categorias}
+              />
             ))}
           </div>
         )}

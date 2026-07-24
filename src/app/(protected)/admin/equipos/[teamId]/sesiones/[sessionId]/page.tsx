@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import SessionEditForm from "@/components/SessionEditForm";
+import { getPlayersForTeam } from "@/lib/queries/players";
 
 export default async function AdminSesionEditPage({
   params,
@@ -24,11 +25,7 @@ export default async function AdminSesionEditPage({
 
   if (!session || session.team_id !== teamId) notFound();
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, nombre, posicion")
-    .eq("team_id", teamId)
-    .order("nombre");
+  const players = await getPlayersForTeam(supabase, teamId);
 
   const { data: attendance } = await supabase
     .from("attendance")

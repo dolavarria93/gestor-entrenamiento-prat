@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { ordenSiguiente } from "@/lib/plan";
+import { getPlayersForTeam } from "@/lib/queries/players";
 import TeamTabs from "@/components/TeamTabs";
 import SessionDateStrip from "./SessionDateStrip";
 import SessionForm from "./SessionForm";
@@ -32,11 +33,7 @@ export default async function EquipoSesionPage({
     .eq("id", team.categoria_id)
     .maybeSingle();
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, nombre, posicion")
-    .eq("team_id", teamId)
-    .order("nombre");
+  const players = await getPlayersForTeam(supabase, teamId);
 
   const today = new Date().toISOString().slice(0, 10);
   const fechaSeleccionada = sp.fecha ?? today;
@@ -114,7 +111,7 @@ export default async function EquipoSesionPage({
         contenidoPlanificado={contenidoPlanificado}
         contenidoRealizadoInicial={sesion?.contenido_realizado ?? ""}
         observacionesInicial={sesion?.observaciones ?? ""}
-        players={players ?? []}
+        players={players}
         asistenciaPrevia={asistenciaPrevia}
         yaRegistrada={Boolean(sesion)}
       />

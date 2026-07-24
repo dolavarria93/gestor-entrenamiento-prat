@@ -1,9 +1,16 @@
 import Link from "next/link";
 
-export default function TeamTabs({ teamId, active }: { teamId: string; active: "sesion" | "evaluaciones" }) {
+export default function TeamTabs({
+  teamId,
+  active,
+}: {
+  teamId: string;
+  active: "sesion" | "evaluaciones" | "jugadores";
+}) {
   const tabs = [
     { key: "sesion", label: "Sesión de hoy", href: `/entrenador/${teamId}` },
     { key: "evaluaciones", label: "Evaluación", href: `/entrenador/${teamId}/evaluaciones` },
+    { key: "jugadores", label: "Jugadores", href: `/entrenador/${teamId}/jugadores` },
   ] as const;
 
   return (

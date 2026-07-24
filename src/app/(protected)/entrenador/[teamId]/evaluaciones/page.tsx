@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import { PERIODOS } from "@/lib/fundamentos";
 import { getFundamentos } from "@/lib/queries/categorias";
+import { getPlayersForTeam } from "@/lib/queries/players";
 import type { Periodo } from "@/lib/supabase/database.types";
 import TeamTabs from "@/components/TeamTabs";
 import EvaluationForm from "@/components/EvaluationForm";
@@ -34,15 +35,11 @@ export default async function EvaluacionesPage({
     .eq("id", team.categoria_id)
     .maybeSingle();
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, nombre")
-    .eq("team_id", teamId)
-    .order("nombre");
+  const players = await getPlayersForTeam(supabase, teamId);
 
   const fundamentos = await getFundamentos(supabase, team.categoria_id);
 
-  const selectedPlayerId = sp.player ?? players?.[0]?.id ?? "";
+  const selectedPlayerId = sp.player ?? players[0]?.id ?? "";
   const selectedPeriodo = (sp.periodo as Periodo) ?? PERIODOS[0];
 
   let puntajesPrevios: Record<string, number> = {};
@@ -67,7 +64,7 @@ export default async function EvaluacionesPage({
 
       <TeamTabs teamId={team.id} active="evaluaciones" />
 
-      {!players || players.length === 0 ? (
+      {players.length === 0 ? (
         <p className="text-ink/50">Este equipo todavía no tiene jugadores cargados.</p>
       ) : fundamentos.length === 0 ? (
         <p className="text-ink/50">
